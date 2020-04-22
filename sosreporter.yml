@@ -1,0 +1,33 @@
+#!/usr/bin/ansible
+
+---
+- hosts: all
+  gather_facts: false
+  vars:
+    sosreport_output_dir: /var/tmp/sosreporter
+  tasks:
+    - name: ensure output dir exists and is empty
+      file:
+        path: "{{ sosreport_output_dir }}"
+        state: "{{ item }}"
+      loop:
+        - absent
+        - directory
+
+    - name: run sosreport
+      command: >-
+        sosreport --batch --tmp-dir {{ sosreport_output_dir }}
+        {% if case_id is defined %}--ticket-number {{ case_id }}{% endif %}
+        {{ sosreport_args|default('') }}
+
+    - name: find output files
+      find:
+        path: "{{ sosreport_output_dir }}"
+      register: files
+
+    - name: copy reports to local system
+      fetch:
+        src: "{{ item.path }}"
+        dest: "reports/{{ inventory_hostname }}/"
+        flat: true
+      loop: "{{ files.files }}"
